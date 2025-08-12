@@ -3,7 +3,7 @@
 import sys
 from PyQt6.QtWidgets import QWidget, QLabel, QApplication, QPushButton
 
-from field_manager import Field_Manager
+from field_manager_window import Field_Manager
 
 
 class FarmManager(QWidget):
