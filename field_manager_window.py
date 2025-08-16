@@ -7,6 +7,7 @@ class Field_Manager(QWidget):
     def __init__(self):
         super().__init__()
 
+        #GUI
         self.setWindowTitle('Field Manager')
         self.setGeometry(100, 100, 300, 300)
         label = QLabel('This is the field manager window!', self)
@@ -20,10 +21,6 @@ class Field_Manager(QWidget):
         #remove btn to field
         remove_field_btn = QPushButton('Istrinti Lauka', self)
         remove_field_btn.move(100, 150)
-
-        #back btn to main window
-        back_btn = QPushButton('Grizti', self)
-        back_btn.move(100, 180)
 
         self.all_fields_box = QComboBox(self)
         self.all_fields_box.move(100, 210)
@@ -48,13 +45,15 @@ class Field_Manager(QWidget):
         self.all_fields_box.addItems(field_names)
 
     def open_add_field_window(self):
-        if self.add_field_window is None or not self.add_field_window.isVisible():
-            self.add_field_window = AddFieldWindow()
-            self.add_field_window.show()
+        add_window = AddFieldWindow()
+        add_window.exec()  
+        self.refresh_fields()  
     
     def view_selected_field(self):
         field_name = self.all_fields_box.currentText()
         if field_name and field_name != "None":
-            self.view_field_window = ViewFieldWindow(field_name)
+            self.view_field_window = ViewFieldWindow(field_name, parent=self)
             self.view_field_window.show()
+            self.close()
+            
 
