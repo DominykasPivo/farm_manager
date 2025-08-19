@@ -1,6 +1,7 @@
-from PyQt6.QtWidgets import QWidget, QDialog, QLabel, QLineEdit, QPushButton, QFileDialog, QComboBox
+from PyQt6.QtWidgets import QWidget, QMessageBox, QDialog, QLabel, QLineEdit, QPushButton, QFileDialog, QComboBox
 from PyQt6.QtGui import QPixmap
 import os, shutil
+from field_logs import ViewLogsWindow
 
 class AddFieldWindow(QDialog):
     def __init__(self):
@@ -69,13 +70,29 @@ class AddFieldWindow(QDialog):
 
 
 class ViewFieldWindow(QWidget):
-    def __init__(self, field_name, parent=None):
+    def __init__(self, field_name, parent=None, main_window=None):
         super().__init__()
+
+        self.field_name = field_name
+        self.parent = parent
+        self.main_window = main_window
+
         self.setWindowTitle(f'Field: {field_name}')
-        self.setGeometry(200, 200, 800, 700)
+        self.setGeometry(200, 200, 1000, 600)
         info_path = os.path.join('fields', field_name, 'info.txt')
         pic_path = None
         info_text = ""
+
+        #delete field
+        remove_field_btn = QPushButton('Istrinti Lauka', self)
+        remove_field_btn.move(340, 70)
+        remove_field_btn.clicked.connect(self.remove_field)
+
+
+        # Add this after the other buttons in ViewFieldWindow.__init__()
+        self.view_logs_btn = QPushButton('View Logs', self)
+        self.view_logs_btn.move(340, 90)
+        self.view_logs_btn.clicked.connect(self.view_logs)
 
         if os.path.exists(info_path):
             with open(info_path, 'r', encoding='utf-8') as f:
@@ -83,7 +100,11 @@ class ViewFieldWindow(QWidget):
                 info_text = "".join(lines)
                 for line in lines:
                     if line.startswith("Picture:"):
-                        pic_path = line.split("Picture:")[1].strip()
+                        pic_filename = line.split("Picture:")[1].strip()
+                        if pic_filename:
+                            pic_path = os.path.join('fields', field_name, pic_filename)
+                        else:
+                            pic_path = None
                         break
 
         info_label = QLabel(info_text, self)
@@ -91,43 +112,75 @@ class ViewFieldWindow(QWidget):
         info_label.resize(360, 60)
 
         if pic_path and os.path.exists(pic_path):
-            pic_label = QLabel(self)
-            pixmap = QPixmap(pic_path)
-            pic_label.setPixmap(pixmap.scaled(200, 150))
-            pic_label.move(100, 100)
+            if not os.path.isabs(pic_path):
+                pic_path = os.path.join(os.getcwd(), pic_path)
+            if os.path.exists(pic_path):
+                pic_label = QLabel(self)
+                pixmap = QPixmap(pic_path)
+                pic_label.setPixmap(pixmap.scaled(300, 250))
+                pic_label.move(50, 150)
 
         self.field_name = field_name
 
         self.edit_field_btn = QPushButton('Edit', self)
-        self.edit_field_btn.move(340, 180)
+        self.edit_field_btn.move(340, 40)
         self.edit_field_btn.clicked.connect(self.edit_field)
 
         self.back_btn = QPushButton('Back', self)
-        self.back_btn.move(340, 220)
+        self.back_btn.move(340, 20)
         self.back_btn.clicked.connect(self.go_back)
 
         self.parent = parent
 
+    def view_logs(self):
+        self.logs_window = ViewLogsWindow(self.field_name, self)
+        self.logs_window.show()
+
+    def remove_field(self):
+        confirm = QMessageBox.question(
+            self,
+            "Confirm Delete",
+            f"Are you sure you want to delete the field '{self.field_name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+
+        if confirm == QMessageBox.StandardButton.Yes:
+            fields_dir = 'fields'
+            field_folder = os.path.join(fields_dir, self.field_name)
+
+            if os.path.exists(field_folder) and os.path.isdir(field_folder):
+                try:
+                    shutil.rmtree(field_folder)  # deletes folder + picture
+                except Exception as e:
+                    QMessageBox.warning(self, "Error", f"Could not delete field: {e}")
+                    return
+
+            self.close()
+            if self.main_window:
+                self.main_window.refresh_fields()
+                self.main_window.show()
+
     def go_back(self):
         self.close()
-        
-        from field_manager_window import Field_Manager
-        main_window = Field_Manager()
-        main_window.show()
+        if self.main_window:
+            self.main_window.show()
+            self.main_window.refresh_fields()  
             
 
     def edit_field(self):
-        edit_window = EditFieldWindow(self.field_name, parent=self)
+        edit_window = EditFieldWindow(self.field_name, parent=self, main_window=self.main_window)
         edit_window.exec()
-        # After editing, get the new field name from the edit window
+
+        # After editing, reload the updated field name
         new_field_name = edit_window.name_input.text().strip()
-        self.close()  # Close the old view window
-        # Open a new view window with the updated field name
-        new_view_window = ViewFieldWindow(new_field_name)
-        new_view_window.show()
+        self.close()
+
+        if new_field_name:
+            new_view_window = ViewFieldWindow(new_field_name, parent=None, main_window=self.main_window)
+            new_view_window.show()
 
 class EditFieldWindow(QDialog):
-    def __init__(self, field_name, parent=None):
+    def __init__(self, field_name, parent=None, main_window=None):
         super().__init__()
 
         self.setWindowTitle(f'Field: {field_name}')
@@ -135,6 +188,7 @@ class EditFieldWindow(QDialog):
 
         self.field_name = field_name #store original name
         self.parent = parent
+        self.main_window = main_window
 
         self.name_label = QLabel('Field Name:', self)
         self.name_label.move(20, 20)
@@ -196,10 +250,10 @@ class EditFieldWindow(QDialog):
             fields_dir = 'fields'
             os.makedirs(fields_dir, exist_ok=True)
 
-            # If field name changed, rename folder
+                # If field name changed, rename folder
             old_folder = os.path.join(fields_dir, self.field_name)
             new_folder = os.path.join(fields_dir, name)
-            renamed = False 
+            renamed = False
             if old_folder != new_folder and os.path.exists(old_folder):
                 os.rename(old_folder, new_folder)
                 renamed = True
@@ -207,43 +261,50 @@ class EditFieldWindow(QDialog):
             field_folder = new_folder
             os.makedirs(field_folder, exist_ok=True)
 
-            # Load previous picture path from info.txt
-            prev_pic_dest = ""
+            # Load previous picture filename from info.txt
+            prev_pic_filename = ""
             info_path = os.path.join(field_folder, 'info.txt')
             if os.path.exists(info_path):
                 with open(info_path, 'r', encoding='utf-8') as f:
-                    lines = f.readlines()
-                    for line in lines:
+                    for line in f:
                         if line.startswith("Picture:"):
-                            prev_pic_dest = line.replace("Picture:", "").strip()
+                            prev_pic_filename = line.replace("Picture:", "").strip()
                             break
 
-            # Determine if the picture was changed
-            pic_dest = prev_pic_dest
-            if pic and os.path.exists(pic) and (os.path.abspath(pic) != os.path.abspath(prev_pic_dest)):
-                # Remove previous picture if it exists and is different
-                if prev_pic_dest and os.path.exists(prev_pic_dest):
+            prev_pic_path = os.path.join(field_folder, prev_pic_filename) if prev_pic_filename else ""
+
+            # Handle new picture
+            pic_filename = prev_pic_filename
+            if pic and os.path.exists(pic) and os.path.abspath(pic) != os.path.abspath(prev_pic_path):
+                # Delete old picture if different
+                if prev_pic_path and os.path.exists(prev_pic_path):
                     try:
-                        os.remove(prev_pic_dest)
+                        os.remove(prev_pic_path)
                     except Exception:
                         pass
+                # Copy new picture into folder
                 pic_ext = os.path.splitext(pic)[1]
-                pic_dest = os.path.join(field_folder, f'picture{pic_ext}')
+                pic_filename = f'picture{pic_ext}'
+                pic_dest = os.path.join(field_folder, pic_filename)
                 shutil.copy2(pic, pic_dest)
-            elif renamed and prev_pic_dest and os.path.exists(prev_pic_dest):
-                # Move previous picture to new folder if field was renamed and picture not changed
-                pic_ext = os.path.splitext(prev_pic_dest)[1]
-                new_pic_dest = os.path.join(field_folder, f'picture{pic_ext}')
-                shutil.move(prev_pic_dest, new_pic_dest)
-                pic_dest = new_pic_dest
 
+            elif renamed and prev_pic_path and os.path.exists(prev_pic_path):
+                # If only renamed, move old picture to new folder
+                pic_ext = os.path.splitext(prev_pic_path)[1]
+                new_pic_dest = os.path.join(field_folder, f'picture{pic_ext}')
+                if prev_pic_path != new_pic_dest:
+                    shutil.move(prev_pic_path, new_pic_dest)
+                pic_filename = os.path.basename(new_pic_dest)
+
+            # Save updated info
             with open(os.path.join(field_folder, 'info.txt'), 'w', encoding='utf-8') as f:
                 f.write(f"{name}\n")
                 f.write(f"Hectares: {hectares}\n")
                 f.write(f"Type: {field_type}\n")
-                f.write(f"Picture: {pic_dest}\n")
+                f.write(f"Picture: {pic_filename}\n")
 
             self.close()
+            if self.main_window:
+                self.main_window.refresh_fields()
 
-            self.view_field_window = ViewFieldWindow(name, parent=self)
-            self.view_field_window.show()
+                

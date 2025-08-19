@@ -18,10 +18,6 @@ class Field_Manager(QWidget):
         add_field_btn.move(100, 120)
         add_field_btn.clicked.connect(self.open_add_field_window)
 
-        #remove btn to field
-        remove_field_btn = QPushButton('Istrinti Lauka', self)
-        remove_field_btn.move(100, 150)
-
         self.all_fields_box = QComboBox(self)
         self.all_fields_box.move(100, 210)
         self.refresh_fields()
@@ -52,8 +48,8 @@ class Field_Manager(QWidget):
     def view_selected_field(self):
         field_name = self.all_fields_box.currentText()
         if field_name and field_name != "None":
-            self.view_field_window = ViewFieldWindow(field_name, parent=self)
+            self.view_field_window = ViewFieldWindow(field_name, parent=self, main_window=self)
             self.view_field_window.show()
-            self.close()
+            #self.hide()
             
 
