@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /c/Users/domas/Documents/GitHub/farm_manager && python -c \"\nimport sys\nfrom PyQt6.QtWidgets import QApplication\napp = QApplication\\(sys.argv\\)\nfrom PyQt6.QtWebEngineWidgets import QWebEngineView\nfrom src.windows.field_manager import AddFieldWindow, ViewFieldWindow, EditFieldWindow\nfrom src.windows.field_manager_window import Field_Manager\nprint\\('All imports OK'\\)\n\" 2>&1)",
+      "Bash(cd /c/Users/domas/Documents/GitHub/farm_manager && python -c \"\nimport sys\n# Imports happen BEFORE QApplication — same as main.py module level\nfrom src.windows.field_manager_window import Field_Manager\nfrom src.windows.field_manager import AddFieldWindow, ViewFieldWindow, EditFieldWindow\nfrom PyQt6.QtWidgets import QApplication\napp = QApplication\\(sys.argv\\)\nprint\\('All imports OK'\\)\n\" 2>&1)"
+    ]
+  }
+}

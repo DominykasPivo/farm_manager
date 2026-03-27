@@ -1,4 +1,0 @@
-Type: Poveikis kenkėjams
-Date: 2025-08-15
-Description: AAA
----

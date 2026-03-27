@@ -205,3 +205,13 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# PyInstaller build output
+build/
+dist/
+
+# Farm Manager runtime data
+farm_manager.db
+field_images/
+fields_backup/
+config.json

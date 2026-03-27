@@ -1,4 +1,0 @@
-janino
-Hectares: 13.47
-Type: Rapsas
-Picture: picture.jpeg
