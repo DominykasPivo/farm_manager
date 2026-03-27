@@ -1,0 +1,4 @@
+asd12
+Hectares: 111.0
+Type: Rapsas
+Picture: picture.jpg
