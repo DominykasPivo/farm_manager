@@ -75,7 +75,7 @@ class AddFieldFromMapDialog(QDialog):
         layout.setSpacing(14)
 
         heading = QLabel('Naujas laukas')
-        heading.setStyleSheet('font-size: 15px; font-weight: bold; color: #2e7d32;')
+        heading.setStyleSheet('font-size: 11pt; font-weight: bold; color: #2e7d32;')
         layout.addWidget(heading)
 
         form = QFormLayout()
@@ -128,7 +128,7 @@ class AddFieldWindow(QDialog):
         layout.setSpacing(14)
 
         heading = QLabel('Pridėti lauką')
-        heading.setStyleSheet('font-size: 15px; font-weight: bold; color: #2e7d32;')
+        heading.setStyleSheet('font-size: 11pt; font-weight: bold; color: #2e7d32;')
         layout.addWidget(heading)
 
         form = QFormLayout()
@@ -198,7 +198,7 @@ class ViewFieldWindow(QWidget):
         left.setSpacing(10)
 
         name_label = QLabel(field['name'])
-        name_label.setStyleSheet('font-size: 20px; font-weight: bold; color: #1a1a1a;')
+        name_label.setStyleSheet('font-size: 15pt; font-weight: bold; color: #1a1a1a;')
         left.addWidget(name_label)
 
         form = QFormLayout()
@@ -210,7 +210,7 @@ class ViewFieldWindow(QWidget):
 
         # ── Mini activity log ─────────────────────────────────────────
         activity_label = QLabel('Paskutinis veikimas')
-        activity_label.setStyleSheet('color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 6px;')
+        activity_label.setStyleSheet('color: #666; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 6px;')
         left.addWidget(activity_label)
 
         self.mini_log = QTableWidget()
@@ -286,13 +286,13 @@ class ViewFieldWindow(QWidget):
         else:
             placeholder = QLabel('Riba nebrėžta')
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            placeholder.setStyleSheet('color: #999; font-style: italic; font-size: 13px;')
+            placeholder.setStyleSheet('color: #999; font-style: italic; font-size: 10pt;')
             placeholder.setMinimumWidth(300)
             root.addWidget(placeholder, stretch=1)
 
     def _meta_label(self, text):
         lbl = QLabel(text)
-        lbl.setStyleSheet('color: #666; font-size: 12px;')
+        lbl.setStyleSheet('color: #666; font-size: 9pt;')
         return lbl
 
     def _load_thumb_polygons(self):
@@ -380,7 +380,7 @@ class EditFieldWindow(QDialog):
         layout.setSpacing(14)
 
         heading = QLabel('Redaguoti lauką')
-        heading.setStyleSheet('font-size: 15px; font-weight: bold; color: #2e7d32;')
+        heading.setStyleSheet('font-size: 11pt; font-weight: bold; color: #2e7d32;')
         layout.addWidget(heading)
 
         form = QFormLayout()

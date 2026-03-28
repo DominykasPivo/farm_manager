@@ -59,30 +59,45 @@ MAP_HTML = """
       letter-spacing: 0.5px;
       margin-bottom: 5px;
     }}
-    .filter-btn {{
+    .filter-row {{
       display: flex;
-      align-items: center;
-      gap: 6px;
+      flex-direction: column;
+      margin-bottom: 6px;
+    }}
+    .filter-row-label {{
+      color: #bbb;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 3px;
+    }}
+    .filter-select {{
       width: 100%;
-      margin: 2px 0;
-      padding: 5px 8px;
-      background: rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.12);
       color: #fff;
-      border: 1px solid rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.25);
       border-radius: 3px;
-      cursor: pointer;
+      padding: 5px 7px;
       font-size: 12px;
-      text-align: left;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      outline: 0 !important;
     }}
-    .filter-btn:hover {{ background: rgba(255,255,255,0.2); }}
-    .filter-btn.active {{
-      background: rgba(255,255,255,0.3);
-      border-color: rgba(255,255,255,0.7);
+    .filter-select:hover {{
+      background: rgba(255,255,255,0.25);
+      border-color: rgba(100,180,255,0.8);
+      outline: 0 !important;
     }}
-    .filter-dot {{
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
+    .filter-select:focus,
+    .filter-select:active {{
+      outline: 0 !important;
+      box-shadow: none !important;
+      border-color: rgba(255,255,255,0.25);
+    }}
+    .filter-select option {{
+      background: #2a2a2a;
+      color: #fff;
     }}
   </style>
 </head>
@@ -150,16 +165,17 @@ MAP_HTML = """
       'Z. rapsas':   '#66bb6a'
     }};
     var ACTIVITY_COLORS = {{
-      'Sėja':              '#2196f3',
-      'Tręšimas':          '#9c27b0',
-      'Žolinimas':         '#009688',
-      'Derliaus nuėmimas': '#4caf50',
-      'Lėkščiavimas':      '#ff9800',
-      'Akėjimas':          '#795548',
-      'Purškimas':         '#f44336',
-      'Lyginimas':         '#607d8b',
-      'Krovimo darbai':    '#fdd835',
-      'Žemės dirbimas':    '#8d6e63'
+      'Sėja':                  '#2196f3',
+      'Tręšimas':              '#9c27b0',
+      'Žolinimas':             '#009688',
+      'Derliaus nuėmimas':     '#4caf50',
+      'Derliaus pristatymas':  '#00897b',
+      'Lėkščiavimas':          '#ff9800',
+      'Akėjimas':              '#795548',
+      'Purškimas':             '#f44336',
+      'Lyginimas':             '#607d8b',
+      'Krovimo darbai':        '#fdd835',
+      'Žemės dirbimas':        '#8d6e63'
     }};
     function typeColor(t)     {{ return TYPE_COLORS[t]     || '#ff7800'; }}
     function activityColor(a) {{ return ACTIVITY_COLORS[a] || '#777'; }}
@@ -201,17 +217,20 @@ MAP_HTML = """
       polygonLayers.push({{
         layer: layer,
         markerLayer: markerLayer,
-        last_activity: p.last_activity || ''
+        last_activity: p.last_activity || '',
+        field_type: p.field_type || ''
       }});
     }}
 
     // ── Filtering ─────────────────────────────────────────────────────
-    var activeFilter = '';
+    var activeActivityFilter = '';
+    var activeTypeFilter = '';
 
-    function filterByActivity(activity) {{
-      activeFilter = activity;
+    function applyFilters() {{
       polygonLayers.forEach(function(item) {{
-        var match = !activity || item.last_activity === activity;
+        var matchActivity = !activeActivityFilter || item.last_activity === activeActivityFilter;
+        var matchType     = !activeTypeFilter     || item.field_type    === activeTypeFilter;
+        var match = matchActivity && matchType;
         item.layer.setStyle({{
           opacity:     match ? 1    : 0.12,
           fillOpacity: match ? 0.2  : 0.04
@@ -220,45 +239,63 @@ MAP_HTML = """
       }});
     }}
 
-    // ── Filter control ────────────────────────────────────────────────
+    function filterByActivity(activity) {{ activeActivityFilter = activity; applyFilters(); }}
+    function filterByType(type)         {{ activeTypeFilter     = type;     applyFilters(); }}
+
+    // ── Combined filter control (bottom-left) ────────────────────────
     var FilterControl = L.Control.extend({{
       options: {{ position: 'bottomleft' }},
       onAdd: function() {{
         var container = L.DomUtil.create('div', 'filter-control');
         L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.disableScrollPropagation(container);
 
         var title = L.DomUtil.create('div', 'filter-title', container);
-        title.textContent = 'Filtruoti pagal veiklą';
+        title.textContent = 'Filtrai';
 
-        var entries = [
-          {{ label: 'Visi laukai',          activity: '' }},
-          {{ label: 'Sėja',                activity: 'Sėja' }},
-          {{ label: 'Tręšimas',            activity: 'Tręšimas' }},
-          {{ label: 'Žolinimas',           activity: 'Žolinimas' }},
-          {{ label: 'Derliaus nuėmimas',   activity: 'Derliaus nuėmimas' }},
-          {{ label: 'Lėkščiavimas',        activity: 'Lėkščiavimas' }},
-          {{ label: 'Akėjimas',            activity: 'Akėjimas' }},
-          {{ label: 'Purškimas',           activity: 'Purškimas' }},
-          {{ label: 'Lyginimas',           activity: 'Lyginimas' }},
-          {{ label: 'Krovimo darbai',      activity: 'Krovimo darbai' }},
-          {{ label: 'Žemės dirbimas',      activity: 'Žemės dirbimas' }}
-        ];
-
-        var buttons = [];
-        entries.forEach(function(entry) {{
-          var btn = L.DomUtil.create('button', 'filter-btn', container);
-          var dot = L.DomUtil.create('span', 'filter-dot', btn);
-          dot.style.background = entry.activity ? activityColor(entry.activity) : '#aaa';
-          btn.appendChild(document.createTextNode(entry.label));
-          if (!entry.activity) btn.classList.add('active');
-          buttons.push(btn);
-
-          L.DomEvent.on(btn, 'click', function() {{
-            buttons.forEach(function(b) {{ b.classList.remove('active'); }});
-            btn.classList.add('active');
-            filterByActivity(entry.activity);
-          }});
+        // Activity dropdown
+        var actRow = L.DomUtil.create('div', 'filter-row', container);
+        var actLbl = L.DomUtil.create('div', 'filter-row-label', actRow);
+        actLbl.textContent = 'Veikla';
+        var actSelect = L.DomUtil.create('select', 'filter-select', actRow);
+        [
+          ['', 'Visos veiklos'],
+          ['Sėja', 'Sėja'],
+          ['Tręšimas', 'Tręšimas'],
+          ['Žolinimas', 'Žolinimas'],
+          ['Derliaus nuėmimas', 'Derliaus nuėmimas'],
+          ['Derliaus pristatymas', 'Derliaus pristatymas'],
+          ['Lėkščiavimas', 'Lėkščiavimas'],
+          ['Akėjimas', 'Akėjimas'],
+          ['Purškimas', 'Purškimas'],
+          ['Lyginimas', 'Lyginimas'],
+          ['Krovimo darbai', 'Krovimo darbai'],
+          ['Žemės dirbimas', 'Žemės dirbimas']
+        ].forEach(function(e) {{
+          var opt = document.createElement('option');
+          opt.value = e[0]; opt.textContent = e[1];
+          actSelect.appendChild(opt);
         }});
+        L.DomEvent.on(actSelect, 'change', function() {{ filterByActivity(actSelect.value); actSelect.blur(); }});
+
+        // Type dropdown
+        var typeRow = L.DomUtil.create('div', 'filter-row', container);
+        var typeLbl = L.DomUtil.create('div', 'filter-row-label', typeRow);
+        typeLbl.textContent = 'Tipas';
+        var typeSelect = L.DomUtil.create('select', 'filter-select', typeRow);
+        [
+          ['', 'Visi tipai'],
+          ['Z. mieziai', 'Z. mieziai'],
+          ['kvieciai', 'Kvieciai'],
+          ['Z. kvieciai', 'Z. kvieciai'],
+          ['Rapsas', 'Rapsas'],
+          ['Z. rapsas', 'Z. rapsas']
+        ].forEach(function(e) {{
+          var opt = document.createElement('option');
+          opt.value = e[0]; opt.textContent = e[1];
+          typeSelect.appendChild(opt);
+        }});
+        L.DomEvent.on(typeSelect, 'change', function() {{ filterByType(typeSelect.value); typeSelect.blur(); }});
 
         return container;
       }}
@@ -332,6 +369,10 @@ class MapWindow(QWidget):
         self.home_btn.clicked.connect(self._save_home)
         toolbar.addWidget(self.home_btn)
         toolbar.addStretch()
+        back_btn = QPushButton('← Grįžti')
+        back_btn.setProperty('secondary', 'true')
+        back_btn.clicked.connect(self.close)
+        toolbar.addWidget(back_btn)
         layout.addLayout(toolbar)
 
         # Map

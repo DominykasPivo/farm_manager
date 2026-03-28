@@ -1,7 +1,15 @@
 import sys
 import os
 from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, qInstallMessageHandler, QtMsgType
+
+
+def _qt_msg_handler(msg_type, _context, message):
+    if 'setPointSize' in message:
+        return
+    print(message, file=sys.stderr)
+
+qInstallMessageHandler(_qt_msg_handler)
 
 from src.database import init_db, migrate_from_files
 from src.windows.field_manager_window import Field_Manager
@@ -14,7 +22,7 @@ APP_STYLE = """
 QWidget {
     background-color: #f0f2f0;
     font-family: 'Segoe UI', Arial, sans-serif;
-    font-size: 13px;
+    font-size: 10pt;
     color: #1a1a1a;
 }
 QDialog {
@@ -99,7 +107,7 @@ class FarmManager(QWidget):
 
         title = QLabel('Ūkio valdytojas')
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet('font-size: 16px; font-weight: bold; color: #2e7d32;')
+        title.setStyleSheet('font-size: 12pt; font-weight: bold; color: #2e7d32;')
         layout.addWidget(title)
 
         start_btn = QPushButton('Pradėti')
