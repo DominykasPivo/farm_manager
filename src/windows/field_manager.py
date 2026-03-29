@@ -57,7 +57,7 @@ FIELD_THUMB_HTML = """
 </html>
 """
 
-CROP_TYPES = ['Z. mieziai', 'kvieciai', 'Z. kvieciai', 'Rapsas', 'Z. rapsas']
+CROP_TYPES = ['Ž. Miežiai', 'Kvieciai', 'Ž. Kvieciai', 'Rapsas', 'Ž. Rapsas', 'Soja']
 
 
 class AddFieldFromMapDialog(QDialog):
@@ -222,7 +222,7 @@ class ViewFieldWindow(QWidget):
         self.mini_log.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.mini_log.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.mini_log.setAlternatingRowColors(True)
-        self.mini_log.setMaximumHeight(148)
+        self.mini_log.setMaximumHeight(390)
         self.mini_log.setStyleSheet("""
             QTableWidget {
                 background: #ffffff;
@@ -317,7 +317,7 @@ class ViewFieldWindow(QWidget):
         new_view.show()
 
     def _load_mini_logs(self):
-        logs = get_field_logs(self.field_id)[:5]
+        logs = get_field_logs(self.field_id)[:12]
         self.mini_log.setRowCount(len(logs))
         for row, log in enumerate(logs):
             self.mini_log.setItem(row, 0, QTableWidgetItem(log['date']))

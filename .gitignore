@@ -215,3 +215,6 @@ farm_manager.db
 field_images/
 fields_backup/
 config.json
+
+# Claude Code
+.claude/

@@ -15,7 +15,6 @@ def _connect():
 
 
 def init_db():
-    os.makedirs(IMAGES_DIR, exist_ok=True)
     conn = _connect()
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS fields (
@@ -23,7 +22,9 @@ def init_db():
             name         TEXT UNIQUE NOT NULL,
             hectares     REAL,
             type         TEXT,
-            picture_path TEXT
+            picture_path TEXT,
+            harvested    INTEGER NOT NULL DEFAULT 0,
+            status       TEXT
         );
         CREATE TABLE IF NOT EXISTS logs (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,15 +66,32 @@ def init_db():
         conn.commit()
     except sqlite3.OperationalError:
         pass  # Column already exists
+    # Migrate: add harvested column to fields if it doesn't exist yet
+    try:
+        conn.execute("ALTER TABLE fields ADD COLUMN harvested INTEGER NOT NULL DEFAULT 0")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    # Migrate: add status column to fields if it doesn't exist yet
+    try:
+        conn.execute("ALTER TABLE fields ADD COLUMN status TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     conn.commit()
     conn.close()
 
 
 def get_all_fields():
     conn = _connect()
-    rows = conn.execute(
-        "SELECT id, name, hectares, type, picture_path FROM fields ORDER BY name"
-    ).fetchall()
+    rows = conn.execute("""
+        SELECT f.id, f.name, f.hectares, f.type, f.picture_path, f.harvested, f.status,
+               (SELECT l.type FROM logs l
+                WHERE l.field_id = f.id
+                ORDER BY l.date DESC, l.id DESC LIMIT 1) AS last_activity
+        FROM fields f
+        ORDER BY f.name
+    """).fetchall()
     conn.close()
     return rows
 
@@ -81,11 +99,31 @@ def get_all_fields():
 def get_field(field_id: int):
     conn = _connect()
     row = conn.execute(
-        "SELECT id, name, hectares, type, picture_path FROM fields WHERE id = ?",
+        "SELECT id, name, hectares, type, picture_path, harvested, status FROM fields WHERE id = ?",
         (field_id,)
     ).fetchone()
     conn.close()
     return row
+
+
+def set_field_status(field_id: int, status):
+    conn = _connect()
+    conn.execute(
+        "UPDATE fields SET status = ? WHERE id = ?",
+        (status, field_id)
+    )
+    conn.commit()
+    conn.close()
+
+
+def set_field_harvested(field_id: int, harvested: bool):
+    conn = _connect()
+    conn.execute(
+        "UPDATE fields SET harvested = ? WHERE id = ?",
+        (1 if harvested else 0, field_id)
+    )
+    conn.commit()
+    conn.close()
 
 
 def add_field(name: str, hectares: float, field_type: str, picture_path) -> int:
@@ -313,6 +351,7 @@ def get_all_polygons() -> list:
     conn = _connect()
     rows = conn.execute("""
         SELECT p.id, p.field_id, p.coordinates, f.name AS field_name, f.type AS field_type,
+               f.status AS field_status, f.harvested AS field_harvested,
                (SELECT l.type FROM logs l
                 WHERE l.field_id = f.id
                 ORDER BY l.date DESC, l.id DESC LIMIT 1) AS last_activity
