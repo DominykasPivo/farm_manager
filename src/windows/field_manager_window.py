@@ -7,6 +7,7 @@ from src.windows.field_manager import AddFieldWindow, ViewFieldWindow
 from src.windows.map_window import MapWindow
 from src.windows.price_presets import PricePresetsDialog
 from src.windows.cost_report import CostReportWindow
+from src.windows.vehicle_expenses import VehicleExpensesWindow
 from src.services.field_service import get_all_fields, CROP_TYPES
 
 
@@ -72,11 +73,17 @@ class Field_Manager(QWidget):
         report_btn.clicked.connect(self._open_report)
         layout.addWidget(report_btn)
 
+        vehicles_btn = QPushButton('Transporto išlaidos')
+        vehicles_btn.setProperty('secondary', 'true')
+        vehicles_btn.clicked.connect(self._open_vehicle_expenses)
+        layout.addWidget(vehicles_btn)
+
         layout.addStretch()
 
         self.view_field_window = None
         self.map_window = None
         self.cost_report_window = None
+        self.vehicle_expenses_window = None
 
         self.adjustSize()
 
@@ -132,3 +139,7 @@ class Field_Manager(QWidget):
     def _open_report(self):
         self.cost_report_window = CostReportWindow(self)
         self.cost_report_window.show()
+
+    def _open_vehicle_expenses(self):
+        self.vehicle_expenses_window = VehicleExpensesWindow(self)
+        self.vehicle_expenses_window.show()

@@ -59,6 +59,18 @@ def init_db():
             name         TEXT UNIQUE NOT NULL,
             price_per_l  REAL NOT NULL DEFAULT 0
         );
+        CREATE TABLE IF NOT EXISTS vehicles (
+            id   INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS vehicle_logs (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            vehicle_id  INTEGER,
+            date        TEXT NOT NULL,
+            description TEXT NOT NULL,
+            cost        REAL NOT NULL DEFAULT 0,
+            FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE
+        );
     """)
     # Migrate: add cost column to logs if it doesn't exist yet
     try:
@@ -340,6 +352,72 @@ def delete_chemical(chem_id: int):
     conn.execute("DELETE FROM chemicals WHERE id = ?", (chem_id,))
     conn.commit()
     conn.close()
+
+
+def get_all_vehicles() -> list:
+    conn = _connect()
+    rows = conn.execute("SELECT id, name FROM vehicles ORDER BY name").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def add_vehicle(name: str) -> int:
+    conn = _connect()
+    cursor = conn.execute("INSERT INTO vehicles (name) VALUES (?)", (name,))
+    vid = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return vid
+
+
+def delete_vehicle(vehicle_id: int):
+    conn = _connect()
+    conn.execute("DELETE FROM vehicles WHERE id = ?", (vehicle_id,))
+    conn.commit()
+    conn.close()
+
+
+def get_vehicle_logs(vehicle_id) -> list:
+    conn = _connect()
+    rows = conn.execute(
+        "SELECT id, vehicle_id, date, description, cost FROM vehicle_logs "
+        "WHERE vehicle_id IS ? ORDER BY date DESC, id DESC",
+        (vehicle_id,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def add_vehicle_log(vehicle_id, date: str, description: str, cost: float) -> int:
+    conn = _connect()
+    cursor = conn.execute(
+        "INSERT INTO vehicle_logs (vehicle_id, date, description, cost) VALUES (?, ?, ?, ?)",
+        (vehicle_id, date, description, cost)
+    )
+    lid = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return lid
+
+
+def delete_vehicle_log(log_id: int):
+    conn = _connect()
+    conn.execute("DELETE FROM vehicle_logs WHERE id = ?", (log_id,))
+    conn.commit()
+    conn.close()
+
+
+def get_all_vehicle_cost_summary() -> list:
+    conn = _connect()
+    rows = conn.execute("""
+        SELECT COALESCE(v.name, 'Kita') AS name, SUM(vl.cost) AS total
+        FROM vehicle_logs vl
+        LEFT JOIN vehicles v ON vl.vehicle_id = v.id
+        GROUP BY vl.vehicle_id
+        ORDER BY name
+    """).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 def add_polygon(field_id: int, coordinates: str) -> int:
