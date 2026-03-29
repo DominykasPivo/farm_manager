@@ -1,13 +1,13 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
-                             QPushButton, QComboBox, QLabel, QFrame,
+                             QPushButton, QComboBox, QFrame,
                              QListWidget, QListWidgetItem, QLineEdit)
 from PyQt6.QtCore import Qt
 
-from src.windows.field_manager import AddFieldWindow, ViewFieldWindow, CROP_TYPES
+from src.windows.field_manager import AddFieldWindow, ViewFieldWindow
 from src.windows.map_window import MapWindow
 from src.windows.price_presets import PricePresetsDialog
 from src.windows.cost_report import CostReportWindow
-from src.database import get_all_fields
+from src.services.field_service import get_all_fields, CROP_TYPES
 
 
 class Field_Manager(QWidget):
@@ -74,7 +74,6 @@ class Field_Manager(QWidget):
 
         layout.addStretch()
 
-        self.add_field_window = None
         self.view_field_window = None
         self.map_window = None
         self.cost_report_window = None

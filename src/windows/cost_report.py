@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QDate
 
-from src.database import get_all_fields_cost_summary
+from src.services.log_service import get_all_fields_cost_summary
 
 
 class CostReportWindow(QWidget):

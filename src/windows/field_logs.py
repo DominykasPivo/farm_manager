@@ -2,25 +2,25 @@ from PyQt6.QtWidgets import (
     QDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QComboBox, QDateTimeEdit, QDoubleSpinBox, QVBoxLayout, QGroupBox,
     QWidget, QTableWidget, QTableWidgetItem, QHeaderView,
-    QAbstractItemView,
+    QAbstractItemView, QMessageBox,
 )
 from PyQt6.QtCore import QDateTime, Qt
 
 from src.database import (
-    get_field, get_field_logs, add_log, get_preset, get_field_cost_summary,
+    get_field, get_field_logs, add_log, delete_log, get_preset, get_field_cost_summary,
     get_all_fertilizers, get_all_seeds, get_all_chemicals, FUEL_PRESET_KEY,
 )
 
 # Each entry: (display label, storage key)
 LOG_FIELDS = {
-    'Sėja':              [('Veislė', 'veisle'), ('Kiekis (norma)', 'kiekis'), ('Kuras (Litrai)', 'kuras')],
+    'Sėja':              [('Veislė', 'veisle'), ('Kiekis (kg/ha)', 'kiekis'), ('Kuras (Litrai)', 'kuras')],
     'Tręšimas':          [('Trąšos', 'trasos'), ('Kiekis (kg/ha)', 'kiekis'), ('Kuras (Litrai)', 'kuras')],
     'Žolinimas':         [('Veislės', 'veisles'), ('Kuras (Litrai)', 'kuras')],
-    'Derliaus nuėmimas':    [('Tonažas (iš 1 ha)', 'tonazas'), ('Kiekis (pristatymo - Tonos)', 'kiekis_k'), ('Kuras (Litrai)', 'kuras')],
-    'Derliaus pristatymas': [('Klasė', 'klase'), ('Tonažas (t)', 'tonazas'), ('Kaina (€/t)', 'kaina_t'), ('Kuras (Litrai)', 'kuras')],
+    'Derliaus nuėmimas':    [('Tonažas (iš 1 ha)', 'tonazas'), ('Kiekis (nuėmimo - Tonos)', 'kiekis_k'), ('Kuras (Litrai)', 'kuras')],
+    'Derliaus pristatymas': [('Klasė', 'klase'), ('Tonažas (t)', 'tonazas'), ('Kiekis (pristatymo - Tonos)', 'kiekis_k'), ('Kaina (€/t)', 'kaina_t'), ('Kuras (Litrai)', 'kuras')],
     'Lėkščiavimas':      [('Kuras (Litrai)', 'kuras')],
     'Akėjimas':          [('Kuras (Litrai)', 'kuras')],
-    'Purškimas':         [('Chemija', 'chemija'), ('Kiekis (norma)', 'kiekis'), ('Kuras (Litrai)', 'kuras')],
+    'Purškimas':         [('Chemija', 'chemija'), ('Kiekis (l/ha)', 'kiekis'), ('Kuras (Litrai)', 'kuras')],
     'Lyginimas':         [('Kuras (Litrai)', 'kuras')],
     'Krovimo darbai':    [('Kuras (Litrai)', 'kuras')],
     'Žemės dirbimas':    [('Kuras (Litrai)', 'kuras')],
@@ -233,6 +233,11 @@ class ViewLogsWindow(QWidget):
         add_btn = QPushButton('Pridėti įrašą')
         add_btn.clicked.connect(self._open_add_log)
         top_row.addWidget(add_btn)
+        self.del_btn = QPushButton('Trinti įrašą')
+        self.del_btn.setProperty('danger', 'true')
+        self.del_btn.setEnabled(False)
+        self.del_btn.clicked.connect(self._delete_log)
+        top_row.addWidget(self.del_btn)
         layout.addLayout(top_row)
 
         self.table = QTableWidget()
@@ -265,6 +270,9 @@ class ViewLogsWindow(QWidget):
                 color: #555;
             }
         """)
+        self.table.itemSelectionChanged.connect(
+            lambda: self.del_btn.setEnabled(bool(self.table.selectedItems()))
+        )
         layout.addWidget(self.table)
 
         # Cost summary section
@@ -288,7 +296,9 @@ class ViewLogsWindow(QWidget):
         self.table.setRowCount(len(logs))
 
         for row, log in enumerate(logs):
-            self.table.setItem(row, 0, QTableWidgetItem(log['date']))
+            date_item = QTableWidgetItem(log['date'])
+            date_item.setData(Qt.ItemDataRole.UserRole, log['id'])
+            self.table.setItem(row, 0, date_item)
             self.table.setItem(row, 1, QTableWidgetItem(log['type']))
             summary = log['description'].replace('\n', '  |  ')
             self.table.setItem(row, 2, QTableWidgetItem(summary))
@@ -330,3 +340,24 @@ class ViewLogsWindow(QWidget):
         total_lbl.setTextFormat(Qt.TextFormat.RichText)
         total_lbl.setStyleSheet('font-size: 10pt; color: #1b5e20;')
         self.summary_layout.addWidget(total_lbl)
+
+    def _delete_log(self):
+        row = self.table.currentRow()
+        if row < 0:
+            return
+        log_id   = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        date     = self.table.item(row, 0).text()
+        log_type = self.table.item(row, 1).text()
+        confirm = QMessageBox.question(
+            self, 'Patvirtinti trynimą',
+            f'Ištrinti įrašą "{log_type}" ({date})?\nŠio veiksmo negalima atšaukti.',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            delete_log(log_id)
+        except Exception as e:
+            QMessageBox.warning(self, 'Klaida', f'Nepavyko ištrinti įrašo: {e}')
+            return
+        self._load_logs()

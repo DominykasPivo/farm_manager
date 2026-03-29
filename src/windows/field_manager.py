@@ -8,56 +8,13 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 
-from src.database import (
+from src.services.field_service import (
     add_field, delete_field, get_field,
-    get_field_logs, get_field_polygons, update_field,
+    get_field_polygons, update_field,
+    CROP_TYPES, load_template,
 )
+from src.services.log_service import get_field_logs
 from src.windows.field_logs import ViewLogsWindow
-
-FIELD_THUMB_HTML = """
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <style>
-    * { margin: 0; padding: 0; }
-    #map { width: 100%; height: 100vh; }
-  </style>
-</head>
-<body>
-  <div id="map"></div>
-  <script>
-    var map = L.map('map', {
-      zoomControl: false, attributionControl: false,
-      dragging: false, scrollWheelZoom: false,
-      doubleClickZoom: false, boxZoom: false, keyboard: false
-    }).setView([55.17, 23.88], 7);
-
-    L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      { maxZoom: 19 }
-    ).addTo(map);
-
-    function loadPolygons(polygons) {
-      var layers = [];
-      polygons.forEach(function(p) {
-        var layer = L.geoJSON(JSON.parse(p.coordinates), {
-          style: { color: '#ff7800', weight: 2, fillColor: '#ff7800', fillOpacity: 0.25 }
-        }).addTo(map);
-        layers.push(layer);
-      });
-      if (layers.length > 0) {
-        map.fitBounds(L.featureGroup(layers).getBounds().pad(0.25));
-      }
-    }
-  </script>
-</body>
-</html>
-"""
-
-CROP_TYPES = ['Ž. Miežiai', 'Kvieciai', 'Ž. Kvieciai', 'Rapsas', 'Ž. Rapsas', 'Soja']
 
 
 class AddFieldFromMapDialog(QDialog):
@@ -65,7 +22,6 @@ class AddFieldFromMapDialog(QDialog):
 
     def __init__(self, geojson: str, parent=None):
         super().__init__(parent)
-        self.geojson = geojson
         self.saved_field_id = None
         self.setWindowTitle('Naujas laukas')
         self.setMinimumWidth(340)
@@ -177,7 +133,6 @@ class ViewFieldWindow(QWidget):
     def __init__(self, field_id, parent=None, main_window=None):
         super().__init__()
         self.field_id = field_id
-        self.parent = parent
         self.main_window = main_window
 
         field = get_field(field_id)
@@ -278,7 +233,7 @@ class ViewFieldWindow(QWidget):
             self.thumb = QWebEngineView()
             self.thumb.setMinimumSize(420, 300)
             self.thumb.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-            self.thumb.setHtml(FIELD_THUMB_HTML)
+            self.thumb.setHtml(load_template('field_thumb.html'))
             self.thumb.loadFinished.connect(
                 lambda ok: self._load_thumb_polygons() if ok else None
             )

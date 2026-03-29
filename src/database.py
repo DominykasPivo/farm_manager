@@ -155,6 +155,13 @@ def delete_field(field_id: int):
     conn.close()
 
 
+def delete_log(log_id: int):
+    conn = _connect()
+    conn.execute("DELETE FROM logs WHERE id = ?", (log_id,))
+    conn.commit()
+    conn.close()
+
+
 def get_field_logs(field_id: int):
     conn = _connect()
     rows = conn.execute(

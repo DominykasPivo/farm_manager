@@ -1,19 +1,17 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QFormLayout, QDoubleSpinBox, QScrollArea, QWidget, QTabWidget,
+    QFormLayout, QDoubleSpinBox, QWidget, QTabWidget,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
     QMessageBox,
 )
 from PyQt6.QtCore import Qt
 
-from src.database import (
+from src.services.preset_service import (
     get_all_presets, set_preset, FUEL_PRESET_KEY,
     get_all_fertilizers, add_fertilizer, update_fertilizer, delete_fertilizer,
     get_all_seeds,       add_seed,       update_seed,       delete_seed,
     get_all_chemicals,   add_chemical,   update_chemical,   delete_chemical,
 )
-from src.windows.field_logs import LOG_TYPES
-
 
 # ── Generic add/edit dialog ───────────────────────────────────────────────────
 
@@ -243,19 +241,11 @@ class PricePresetsDialog(QDialog):
         tab_layout.setContentsMargins(0, 10, 0, 0)
         tab_layout.setSpacing(0)
 
-        hint = QLabel('Bazinė kaina už kiekvieną veiklos tipą. Kuro kaina pridedama automatiškai pagal įvestus litrus.')
-        hint.setWordWrap(True)
-        hint.setStyleSheet('color: #666; font-size: 8pt; padding: 0 4px 8px 4px;')
-        tab_layout.addWidget(hint)
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(scroll.Shape.NoFrame)
         inner = QWidget()
         self._prices_form = QFormLayout(inner)
         self._prices_form.setSpacing(10)
-        scroll.setWidget(inner)
-        tab_layout.addWidget(scroll)
+        self._prices_form.setContentsMargins(0, 10, 0, 0)
+        tab_layout.addWidget(inner)
 
         presets = get_all_presets()
         self._spinboxes = {}
@@ -270,19 +260,7 @@ class PricePresetsDialog(QDialog):
         self._prices_form.addRow(fuel_label, fuel_spin)
         self._spinboxes[FUEL_PRESET_KEY] = fuel_spin
 
-        sep_lbl = QLabel('Bazinės veiklos kainos:')
-        sep_lbl.setStyleSheet('color: #555; font-size: 8pt; padding-top: 6px;')
-        self._prices_form.addRow(sep_lbl)
-
-        for log_type in LOG_TYPES:
-            spinbox = QDoubleSpinBox()
-            spinbox.setRange(0, 9_999_999)
-            spinbox.setDecimals(2)
-            spinbox.setSuffix(' €')
-            spinbox.setValue(presets.get(log_type, 0.0))
-            self._prices_form.addRow(f'{log_type}:', spinbox)
-            self._spinboxes[log_type] = spinbox
-
+        tab_layout.addStretch()
         return tab
 
     def _save_prices(self):
