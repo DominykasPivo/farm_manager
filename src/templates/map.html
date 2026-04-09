@@ -195,7 +195,8 @@
       'Ž. Kvieciai': '#ffb300',
       'Rapsas':      '#c6ef00',
       'Ž. Rapsas':   '#66bb6a',
-      'Soja':        '#9ccc65'
+      'Soja':        '#9ccc65',
+      'Žirniai':     '#80cbc4'
     };
     var ACTIVITY_COLORS = {
       'Sėja':                  '#2196f3',
@@ -219,14 +220,17 @@
     function typeColor(t)     { return TYPE_COLORS[t]     || '#ff7800'; }
     function activityColor(a) { return ACTIVITY_COLORS[a] || '#777'; }
     function fieldColor(status, lastActivity, fieldType) {
-      if (status && ACTIVITY_COLORS[status]) return ACTIVITY_COLORS[status];
-      if (lastActivity && ACTIVITY_COLORS[lastActivity]) return ACTIVITY_COLORS[lastActivity];
       return typeColor(fieldType);
     }
     // ── Polygon store ─────────────────────────────────────────────────
     var polygonLayers = [];
 
     function loadPolygons(polygons) {
+      polygonLayers.forEach(function(item) {
+        map.removeLayer(item.layer);
+        map.removeLayer(item.markerLayer);
+      });
+      polygonLayers = [];
       polygons.forEach(function(p) { addPolygon(p); });
     }
 

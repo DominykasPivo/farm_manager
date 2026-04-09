@@ -2,11 +2,11 @@ import json
 
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 from PyQt6.QtWebChannel import QWebChannel
-from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 
 from src.services.field_service import (
-    add_polygon, get_all_polygons, get_field, set_field_status, set_field_harvested,
+    add_polygon, get_all_polygons, get_all_farmers, get_field, set_field_status, set_field_harvested,
     load_map_config, save_map_config, load_template,
 )
 
@@ -69,6 +69,21 @@ class MapWindow(QWidget):
         self.harvest_toggle_btn.setCheckable(True)
         self.harvest_toggle_btn.clicked.connect(self._toggle_harvest_mode)
         toolbar.addWidget(self.harvest_toggle_btn)
+
+        if not assign_to_field_id:
+            toolbar.addSpacing(12)
+            toolbar.addWidget(QLabel('Ūkininkas:'))
+            toolbar.addSpacing(4)
+            self.farmer_combo = QComboBox()
+            self.farmer_combo.setMinimumWidth(140)
+            self.farmer_combo.addItem('Visi', userData=None)
+            for farmer in get_all_farmers():
+                self.farmer_combo.addItem(farmer['name'], userData=farmer['id'])
+            self.farmer_combo.currentIndexChanged.connect(self._reload_polygons)
+            toolbar.addWidget(self.farmer_combo)
+        else:
+            self.farmer_combo = None
+
         toolbar.addStretch()
         back_btn = QPushButton('← Grįžti')
         back_btn.setProperty('secondary', 'true')
@@ -101,10 +116,14 @@ class MapWindow(QWidget):
 
     def _on_map_loaded(self, ok):
         if ok:
-            polygons = get_all_polygons()
-            self.web_view.page().runJavaScript(
-                f"loadPolygons({json.dumps(polygons)})"
-            )
+            self._reload_polygons()
+
+    def _reload_polygons(self):
+        farmer_id = self.farmer_combo.currentData() if self.farmer_combo else None
+        polygons = get_all_polygons(farmer_id=farmer_id)
+        self.web_view.page().runJavaScript(
+            f"loadPolygons({json.dumps(polygons)})"
+        )
 
     def _handle_polygon_drawn(self, geojson: str):
         if self.assign_to_field_id:

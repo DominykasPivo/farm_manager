@@ -6,6 +6,8 @@ DB_PATH = 'farm_manager.db'
 IMAGES_DIR = 'field_images'
 FUEL_PRESET_KEY = '__kuro_kaina__'
 
+_KEEP = object()  # sentinel for update_field farmer_id
+
 
 def _connect():
     conn = sqlite3.connect(DB_PATH)
@@ -71,6 +73,16 @@ def init_db():
             cost        REAL NOT NULL DEFAULT 0,
             FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS rotation_config (
+            field_id      INTEGER PRIMARY KEY,
+            position      INTEGER NOT NULL DEFAULT 1,
+            legume_choice TEXT NOT NULL DEFAULT 'Žirniai',
+            FOREIGN KEY (field_id) REFERENCES fields(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS farmers (
+            id   INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        );
     """)
     # Migrate: add cost column to logs if it doesn't exist yet
     try:
@@ -90,20 +102,38 @@ def init_db():
         conn.commit()
     except sqlite3.OperationalError:
         pass  # Column already exists
+    # Migrate: add farmer_id column to fields if it doesn't exist yet
+    try:
+        conn.execute("ALTER TABLE fields ADD COLUMN farmer_id INTEGER REFERENCES farmers(id)")
+        conn.commit()
+        if conn.execute("SELECT COUNT(*) FROM fields").fetchone()[0] > 0:
+            conn.execute("INSERT OR IGNORE INTO farmers (name) VALUES ('Numatytasis')")
+            conn.commit()
+            default_id = conn.execute("SELECT id FROM farmers WHERE name = 'Numatytasis'").fetchone()[0]
+            conn.execute("UPDATE fields SET farmer_id = ? WHERE farmer_id IS NULL", (default_id,))
+            conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     conn.commit()
     conn.close()
 
 
-def get_all_fields():
+def get_all_fields(farmer_id=None):
     conn = _connect()
-    rows = conn.execute("""
+    query = """
         SELECT f.id, f.name, f.hectares, f.type, f.picture_path, f.harvested, f.status,
+               f.farmer_id,
                (SELECT l.type FROM logs l
                 WHERE l.field_id = f.id
                 ORDER BY l.date DESC, l.id DESC LIMIT 1) AS last_activity
         FROM fields f
-        ORDER BY f.name
-    """).fetchall()
+    """
+    params = []
+    if farmer_id is not None:
+        query += " WHERE f.farmer_id = ?"
+        params.append(farmer_id)
+    query += " ORDER BY f.name"
+    rows = conn.execute(query, params).fetchall()
     conn.close()
     return rows
 
@@ -111,7 +141,7 @@ def get_all_fields():
 def get_field(field_id: int):
     conn = _connect()
     row = conn.execute(
-        "SELECT id, name, hectares, type, picture_path, harvested, status FROM fields WHERE id = ?",
+        "SELECT id, name, hectares, type, picture_path, harvested, status, farmer_id FROM fields WHERE id = ?",
         (field_id,)
     ).fetchone()
     conn.close()
@@ -138,11 +168,11 @@ def set_field_harvested(field_id: int, harvested: bool):
     conn.close()
 
 
-def add_field(name: str, hectares: float, field_type: str, picture_path) -> int:
+def add_field(name: str, hectares: float, field_type: str, picture_path, farmer_id=None) -> int:
     conn = _connect()
     cursor = conn.execute(
-        "INSERT INTO fields (name, hectares, type, picture_path) VALUES (?, ?, ?, ?)",
-        (name, hectares, field_type, picture_path)
+        "INSERT INTO fields (name, hectares, type, picture_path, farmer_id) VALUES (?, ?, ?, ?, ?)",
+        (name, hectares, field_type, picture_path, farmer_id)
     )
     field_id = cursor.lastrowid
     conn.commit()
@@ -150,12 +180,18 @@ def add_field(name: str, hectares: float, field_type: str, picture_path) -> int:
     return field_id
 
 
-def update_field(field_id: int, name: str, hectares: float, field_type: str, picture_path):
+def update_field(field_id: int, name: str, hectares: float, field_type: str, picture_path, farmer_id=_KEEP):
     conn = _connect()
-    conn.execute(
-        "UPDATE fields SET name=?, hectares=?, type=?, picture_path=? WHERE id=?",
-        (name, hectares, field_type, picture_path, field_id)
-    )
+    if farmer_id is _KEEP:
+        conn.execute(
+            "UPDATE fields SET name=?, hectares=?, type=?, picture_path=? WHERE id=?",
+            (name, hectares, field_type, picture_path, field_id)
+        )
+    else:
+        conn.execute(
+            "UPDATE fields SET name=?, hectares=?, type=?, picture_path=?, farmer_id=? WHERE id=?",
+            (name, hectares, field_type, picture_path, farmer_id, field_id)
+        )
     conn.commit()
     conn.close()
 
@@ -432,9 +468,9 @@ def add_polygon(field_id: int, coordinates: str) -> int:
     return pid
 
 
-def get_all_polygons() -> list:
+def get_all_polygons(farmer_id=None) -> list:
     conn = _connect()
-    rows = conn.execute("""
+    query = """
         SELECT p.id, p.field_id, p.coordinates, f.name AS field_name, f.type AS field_type,
                f.status AS field_status, f.harvested AS field_harvested,
                (SELECT l.type FROM logs l
@@ -442,7 +478,12 @@ def get_all_polygons() -> list:
                 ORDER BY l.date DESC, l.id DESC LIMIT 1) AS last_activity
         FROM polygons p
         JOIN fields f ON p.field_id = f.id
-    """).fetchall()
+    """
+    params = []
+    if farmer_id is not None:
+        query += " WHERE f.farmer_id = ?"
+        params.append(farmer_id)
+    rows = conn.execute(query, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -455,6 +496,83 @@ def get_field_polygons(field_id: int) -> list:
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def get_rotation_config(field_id: int):
+    conn = _connect()
+    row = conn.execute(
+        "SELECT field_id, position, legume_choice FROM rotation_config WHERE field_id = ?",
+        (field_id,)
+    ).fetchone()
+    conn.close()
+    return row
+
+
+def upsert_rotation_config(field_id: int, position: int, legume_choice: str):
+    conn = _connect()
+    conn.execute(
+        "INSERT OR REPLACE INTO rotation_config (field_id, position, legume_choice) VALUES (?, ?, ?)",
+        (field_id, position, legume_choice)
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_all_rotation_configs() -> list:
+    conn = _connect()
+    rows = conn.execute("""
+        SELECT f.id AS field_id, f.name, f.hectares, f.type,
+               COALESCE(rc.position, 1) AS position,
+               COALESCE(rc.legume_choice, 'Žirniai') AS legume_choice
+        FROM fields f
+        LEFT JOIN rotation_config rc ON rc.field_id = f.id
+        ORDER BY f.name
+    """).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_all_farmers() -> list:
+    conn = _connect()
+    rows = conn.execute("SELECT id, name FROM farmers ORDER BY name").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_farmer(farmer_id: int):
+    conn = _connect()
+    row = conn.execute("SELECT id, name FROM farmers WHERE id = ?", (farmer_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def add_farmer(name: str) -> int:
+    conn = _connect()
+    cursor = conn.execute("INSERT INTO farmers (name) VALUES (?)", (name,))
+    fid = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return fid
+
+
+def update_farmer(farmer_id: int, name: str):
+    conn = _connect()
+    conn.execute("UPDATE farmers SET name=? WHERE id=?", (name, farmer_id))
+    conn.commit()
+    conn.close()
+
+
+def delete_farmer(farmer_id: int):
+    conn = _connect()
+    count = conn.execute(
+        "SELECT COUNT(*) FROM fields WHERE farmer_id = ?", (farmer_id,)
+    ).fetchone()[0]
+    if count > 0:
+        conn.close()
+        raise ValueError("Ūkininkas turi laukų")
+    conn.execute("DELETE FROM farmers WHERE id = ?", (farmer_id,))
+    conn.commit()
+    conn.close()
 
 
 def migrate_from_files():

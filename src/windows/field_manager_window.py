@@ -8,7 +8,9 @@ from src.windows.map_window import MapWindow
 from src.windows.price_presets import PricePresetsDialog
 from src.windows.cost_report import CostReportWindow
 from src.windows.vehicle_expenses import VehicleExpensesWindow
-from src.services.field_service import get_all_fields, CROP_TYPES
+from src.windows.crop_rotation import CropRotationWindow
+from src.windows.farmer_manager import FarmerManagerDialog
+from src.services.field_service import get_all_fields, get_all_farmers, CROP_TYPES
 
 
 class Field_Manager(QWidget):
@@ -35,6 +37,10 @@ class Field_Manager(QWidget):
         self.search_box.textChanged.connect(self.refresh_fields)
         layout.addWidget(self.search_box)
 
+        self.farmer_filter_box = QComboBox()
+        self.farmer_filter_box.currentIndexChanged.connect(self.refresh_fields)
+        layout.addWidget(self.farmer_filter_box)
+
         self.type_filter_box = QComboBox()
         self.type_filter_box.addItem('Visi tipai', userData=None)
         for ct in CROP_TYPES:
@@ -57,11 +63,17 @@ class Field_Manager(QWidget):
         btn_row.addWidget(map_btn)
         layout.addLayout(btn_row)
 
+        self.refresh_farmer_filter()
         self.refresh_fields()
 
         sep2 = QFrame()
         sep2.setFrameShape(QFrame.Shape.HLine)
         layout.addWidget(sep2)
+
+        farmers_btn = QPushButton('Ūkininkai')
+        farmers_btn.setProperty('secondary', 'true')
+        farmers_btn.clicked.connect(self._open_farmer_manager)
+        layout.addWidget(farmers_btn)
 
         presets_btn = QPushButton('Kainos nustatymai')
         presets_btn.setProperty('secondary', 'true')
@@ -78,19 +90,40 @@ class Field_Manager(QWidget):
         vehicles_btn.clicked.connect(self._open_vehicle_expenses)
         layout.addWidget(vehicles_btn)
 
+        rotation_btn = QPushButton('Sėjomaina')
+        rotation_btn.setProperty('secondary', 'true')
+        rotation_btn.clicked.connect(self._open_rotation)
+        layout.addWidget(rotation_btn)
+
         layout.addStretch()
 
         self.view_field_window = None
         self.map_window = None
         self.cost_report_window = None
         self.vehicle_expenses_window = None
+        self.rotation_window = None
 
         self.adjustSize()
+
+    def refresh_farmer_filter(self):
+        self.farmer_filter_box.blockSignals(True)
+        current_id = self.farmer_filter_box.currentData()
+        self.farmer_filter_box.clear()
+        self.farmer_filter_box.addItem('Visi ūkininkai', userData=None)
+        for farmer in get_all_farmers():
+            self.farmer_filter_box.addItem(farmer['name'], userData=farmer['id'])
+        # Restore previous selection if still present
+        for i in range(self.farmer_filter_box.count()):
+            if self.farmer_filter_box.itemData(i) == current_id:
+                self.farmer_filter_box.setCurrentIndex(i)
+                break
+        self.farmer_filter_box.blockSignals(False)
 
     def refresh_fields(self):
         search = self.search_box.text().strip().lower()
         selected_type = self.type_filter_box.currentData()
-        fields = get_all_fields()
+        farmer_id = self.farmer_filter_box.currentData()
+        fields = get_all_fields(farmer_id=farmer_id)
         if selected_type:
             fields = [f for f in fields if f['type'] == selected_type]
         if search:
@@ -108,7 +141,8 @@ class Field_Manager(QWidget):
                 self.all_fields_list.addItem(item)
 
     def open_add_field_window(self):
-        add_window = AddFieldWindow()
+        farmer_id = self.farmer_filter_box.currentData()
+        add_window = AddFieldWindow(default_farmer_id=farmer_id)
         add_window.exec()
         self.refresh_fields()
 
@@ -132,6 +166,12 @@ class Field_Manager(QWidget):
         self.map_window.show()
 
 
+    def _open_farmer_manager(self):
+        dialog = FarmerManagerDialog(self)
+        dialog.exec()
+        self.refresh_farmer_filter()
+        self.refresh_fields()
+
     def _open_presets(self):
         dialog = PricePresetsDialog(self)
         dialog.exec()
@@ -143,3 +183,7 @@ class Field_Manager(QWidget):
     def _open_vehicle_expenses(self):
         self.vehicle_expenses_window = VehicleExpensesWindow(self)
         self.vehicle_expenses_window.show()
+
+    def _open_rotation(self):
+        self.rotation_window = CropRotationWindow(self)
+        self.rotation_window.show()

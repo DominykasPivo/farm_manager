@@ -11,6 +11,7 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 from src.services.field_service import (
     add_field, delete_field, get_field,
     get_field_polygons, update_field,
+    get_all_farmers,
     CROP_TYPES, load_template,
 )
 from src.services.log_service import get_field_logs
@@ -40,20 +41,31 @@ class AddFieldFromMapDialog(QDialog):
         self.hectares_input = QLineEdit()
         self.field_type = QComboBox()
         self.field_type.addItems(CROP_TYPES)
+        self.farmer_combo = QComboBox()
+        farmers = get_all_farmers()
+        for f in farmers:
+            self.farmer_combo.addItem(f['name'], userData=f['id'])
         form.addRow('Pavadinimas:', self.name_input)
         form.addRow('Hektarai:', self.hectares_input)
         form.addRow('Tipas:', self.field_type)
+        form.addRow('Ūkininkas:', self.farmer_combo)
         layout.addLayout(form)
+
+        self._no_farmers_label = QLabel('Pirmiausia pridėkite ūkininką')
+        self._no_farmers_label.setStyleSheet('color: #c62828; font-size: 9pt;')
+        self._no_farmers_label.setVisible(not farmers)
+        layout.addWidget(self._no_farmers_label)
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         cancel_btn = QPushButton('Atšaukti')
         cancel_btn.setProperty('secondary', 'true')
         cancel_btn.clicked.connect(self.reject)
-        save_btn = QPushButton('Išsaugoti')
-        save_btn.clicked.connect(self._save)
+        self._save_btn = QPushButton('Išsaugoti')
+        self._save_btn.setEnabled(bool(farmers))
+        self._save_btn.clicked.connect(self._save)
         btn_row.addWidget(cancel_btn)
-        btn_row.addWidget(save_btn)
+        btn_row.addWidget(self._save_btn)
         layout.addLayout(btn_row)
 
     def _save(self):
@@ -65,8 +77,9 @@ class AddFieldFromMapDialog(QDialog):
         except ValueError:
             hectares = 0.0
         field_type = self.field_type.currentText()
+        farmer_id = self.farmer_combo.currentData()
         try:
-            self.saved_field_id = add_field(name, hectares, field_type, None)
+            self.saved_field_id = add_field(name, hectares, field_type, None, farmer_id=farmer_id)
         except Exception as e:
             QMessageBox.warning(self, 'Klaida', f'Nepavyko išsaugoti lauko: {e}')
             return
@@ -74,7 +87,7 @@ class AddFieldFromMapDialog(QDialog):
 
 
 class AddFieldWindow(QDialog):
-    def __init__(self):
+    def __init__(self, default_farmer_id=None):
         super().__init__()
         self.setWindowTitle('Pridėti lauką')
         self.setMinimumWidth(380)
@@ -93,21 +106,37 @@ class AddFieldWindow(QDialog):
         self.hectares_input = QLineEdit()
         self.field_type = QComboBox()
         self.field_type.addItems(CROP_TYPES)
+        self.farmer_combo = QComboBox()
+        farmers = get_all_farmers()
+        for f in farmers:
+            self.farmer_combo.addItem(f['name'], userData=f['id'])
+        if default_farmer_id is not None:
+            for i in range(self.farmer_combo.count()):
+                if self.farmer_combo.itemData(i) == default_farmer_id:
+                    self.farmer_combo.setCurrentIndex(i)
+                    break
 
         form.addRow('Pavadinimas:', self.name_input)
         form.addRow('Hektarai:', self.hectares_input)
         form.addRow('Tipas:', self.field_type)
+        form.addRow('Ūkininkas:', self.farmer_combo)
         layout.addLayout(form)
+
+        self._no_farmers_label = QLabel('Pirmiausia pridėkite ūkininką')
+        self._no_farmers_label.setStyleSheet('color: #c62828; font-size: 9pt;')
+        self._no_farmers_label.setVisible(not farmers)
+        layout.addWidget(self._no_farmers_label)
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         cancel_btn = QPushButton('Atšaukti')
         cancel_btn.setProperty('secondary', 'true')
         cancel_btn.clicked.connect(self.reject)
-        save_btn = QPushButton('Išsaugoti')
-        save_btn.clicked.connect(self._save_field)
+        self._save_btn = QPushButton('Išsaugoti')
+        self._save_btn.setEnabled(bool(farmers))
+        self._save_btn.clicked.connect(self._save_field)
         btn_row.addWidget(cancel_btn)
-        btn_row.addWidget(save_btn)
+        btn_row.addWidget(self._save_btn)
         layout.addLayout(btn_row)
 
     def _save_field(self):
@@ -119,9 +148,10 @@ class AddFieldWindow(QDialog):
         except ValueError:
             hectares = 0.0
         field_type = self.field_type.currentText()
+        farmer_id = self.farmer_combo.currentData()
 
         try:
-            add_field(name, hectares, field_type, None)
+            add_field(name, hectares, field_type, None, farmer_id=farmer_id)
         except Exception as e:
             QMessageBox.warning(self, 'Klaida', f'Nepavyko išsaugoti lauko: {e}')
             return
@@ -347,10 +377,16 @@ class EditFieldWindow(QDialog):
         self.field_type.addItems([''] + CROP_TYPES)
         if field['type']:
             self.field_type.setCurrentText(field['type'])
+        self.farmer_combo = QComboBox()
+        for f in get_all_farmers():
+            self.farmer_combo.addItem(f['name'], userData=f['id'])
+            if f['id'] == field['farmer_id']:
+                self.farmer_combo.setCurrentIndex(self.farmer_combo.count() - 1)
 
         form.addRow('Pavadinimas:', self.name_input)
         form.addRow('Hektarai:', self.hectares_input)
         form.addRow('Tipas:', self.field_type)
+        form.addRow('Ūkininkas:', self.farmer_combo)
         layout.addLayout(form)
 
         btn_row = QHBoxLayout()
@@ -373,9 +409,10 @@ class EditFieldWindow(QDialog):
         except ValueError:
             hectares = 0.0
         field_type = self.field_type.currentText()
+        farmer_id = self.farmer_combo.currentData()
 
         try:
-            update_field(self.field_id, name, hectares, field_type, None)
+            update_field(self.field_id, name, hectares, field_type, None, farmer_id=farmer_id)
         except Exception as e:
             QMessageBox.warning(self, 'Klaida', f'Nepavyko išsaugoti: {e}')
             return

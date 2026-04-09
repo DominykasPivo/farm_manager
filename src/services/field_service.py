@@ -5,9 +5,10 @@ from src.database import (
     get_all_fields, get_field, add_field, update_field, delete_field,
     set_field_status, set_field_harvested,
     add_polygon, get_all_polygons, get_field_polygons,
+    get_all_farmers, add_farmer, update_farmer, delete_farmer,
 )
 
-CROP_TYPES = ['Ž. Miežiai', 'Kvieciai', 'Ž. Kvieciai', 'Rapsas', 'Ž. Rapsas', 'Soja']
+CROP_TYPES = ['Ž. Miežiai', 'Ž. Kvieciai', 'Ž. Rapsas', 'Soja', 'Žirniai']
 
 _CONFIG_PATH = 'config.json'
 _DEFAULT_VIEW = {'lat': 55.1694, 'lng': 23.8813, 'zoom': 7}
